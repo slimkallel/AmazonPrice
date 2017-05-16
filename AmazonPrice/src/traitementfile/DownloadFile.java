@@ -8,6 +8,7 @@ import java.net.URL;
 import java.net.URLConnection;
 
 public class DownloadFile {
+	//Justtesting
 
 	public static final String HOST = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.json";
 
