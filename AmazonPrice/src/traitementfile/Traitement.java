@@ -1656,9 +1656,9 @@ public class Traitement {
 	public static void main(String[] args) throws FileNotFoundException,
 			IOException, ParseException {
 
-		/*AfficheListOnDemandShared();
+		//AfficheListOnDemandShared();
 		getInformationInstance(15, 21);
-		AfficheIpAdress();
+	/*	AfficheIpAdress();
 		AfficheDataTransfert();
 		AfficheLoadBalance();
 
