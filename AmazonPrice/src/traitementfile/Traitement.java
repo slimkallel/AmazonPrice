@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -206,8 +208,6 @@ public class Traitement {
 	 *            this is the list of the shared product .
 	 * @param cpu
 	 *            this is the cpu of the instance .
-	 * @param memory
-	 *            this is the memory of the instance .
 	 * @return int this returns the minimum cpu
 	 */
 
@@ -239,8 +239,58 @@ public class Traitement {
 	}
 
 	/**
+	 * The getMinMem method is used to get a memory
+	 * 
+	 * @param jsonObject
+	 *            this is the json file .
+	 * 
+	 * @param demandShared
+	 *            this is the list of the shared product .
+	 * @param memory
+	 *            this is the memory of the instance .
+	 * @return float this returns the minimum memory
+	 */
+
+	public static float getMinMem(JSONObject json,
+			ArrayList<Object> demandShared, float memory)
+			throws FileNotFoundException, IOException, ParseException {
+
+		JSONObject posts = (JSONObject) json.get("products");
+		ArrayList<Object> memories = new ArrayList<>();
+		int n = 0, k = 0;
+		float min = 0;
+
+		Pattern p = Pattern.compile("-?\\d+(,\\d+)*?\\.?\\d+?");
+		// get all the memories values wich are superior than the cpu enter
+		for (n = 0; n < demandShared.size(); n++) {
+
+			JSONObject prod = (JSONObject) posts.get(demandShared.get(n));
+			JSONObject attr = (JSONObject) prod.get("attributes");
+			String fmemory = (String) attr.get("memory");
+
+			Matcher m = p.matcher(fmemory);
+			while (m.find()) {
+				if ((!m.group().equals("1,952"))) {
+					float mem = Float.parseFloat(m.group());
+					if (memory <= mem) {
+						memories.add(m.group());
+					}
+				}
+			}
+		}
+
+		min = Float.parseFloat((String) memories.get(0));
+		for (k = 1; k < memories.size(); k++) {
+			if ((Float.parseFloat((String) memories.get(k))) < min) {
+				min = Float.parseFloat((String) memories.get(k));
+			}
+		}
+		return min;
+	}
+
+	/**
 	 * The getInstanceMinCpu method is used to get the list of the shared
-	 * product which their cpu is just superior of the enter cpu
+	 * product with conditions about cpu and memory
 	 * 
 	 * @param jsonObject
 	 *            this is the json file .
@@ -248,28 +298,39 @@ public class Traitement {
 	 *            this is the list of the shared product .
 	 * @param cpu
 	 *            this is the cpu of the instance .
-	 * @return ArrayList this returns list of the instances that has their
-	 *         cpu=min
+	 * @param memory
+	 *            this is the memory of the instance .
+	 * @return ArrayList this returns list of the instances
+	 * @throws ParseException
+	 * @throws IOException
+	 * @throws FileNotFoundException
 	 */
 	public static ArrayList<Object> getInstanceMinCpu(JSONObject json,
-			ArrayList<Object> demandShared, int cpu, String memory) {
+			ArrayList<Object> demandShared, int cpu, float memory)
+			throws FileNotFoundException, IOException, ParseException {
 		JSONObject posts = (JSONObject) json.get("products");
-		int min = getMinCpu(json, demandShared, cpu);
+		int min_cpu = getMinCpu(json, demandShared, cpu);
+		float min_mem = getMinMem(json, demandShared, memory);
 		ArrayList<Object> instances = new ArrayList<>();
+		Pattern p = Pattern.compile("-?\\d+(,\\d+)*?\\.?\\d+?");
 		int n = 0;
-
 		for (n = 0; n < demandShared.size(); n++) {
 
 			JSONObject prod = (JSONObject) posts.get(demandShared.get(n));
 			JSONObject attr = (JSONObject) prod.get("attributes");
-
 			int vcpu = Integer.parseInt((String) attr.get("vcpu"));
-
 			String ram = (String) attr.get("memory");
-			if ((vcpu == min) && (memory.equals(ram))) {
-				instances.add(demandShared.get(n));
 
+			Matcher m = p.matcher(ram);
+			while (m.find()) {
+				if ((!m.group().equals("1,952"))) {
+					float mem = Float.parseFloat(m.group());
+					if ((vcpu == min_cpu) && (mem == min_mem)) {
+						instances.add(demandShared.get(n));
+					}
+				}
 			}
+
 		}
 		// get the instances that have their cpu and memory equal to the enter
 		// param
@@ -279,7 +340,7 @@ public class Traitement {
 
 	/**
 	 * The getInformationInstance method is used to get the list of the shared
-	 * product which their cpu=dcpu or juste superios and their memory=dmemory
+	 * product which their cpu=dcpu and memory=dmemory or juste superior
 	 * 
 	 * @param dcpu
 	 *            we have to find the instances that have cpu=dcpu or just
@@ -288,7 +349,7 @@ public class Traitement {
 	 *            we have to find the instances that have memory=dmemory .
 	 * @return Nothing
 	 */
-	public static void getInformationInstance(int dcpu, String dmemory)
+	public static void getInformationInstance(int dcpu, float dmemory)
 			throws FileNotFoundException, IOException, ParseException {
 		ArrayList<Object> demandShared = getListOnDemandShared();
 		JSONObject json = ReadFile();
@@ -296,7 +357,9 @@ public class Traitement {
 		JSONObject posts = (JSONObject) json.get("products");
 
 		int n = 0;
-		int min = getMinCpu(json, demandShared, dcpu);
+		String nmemory = dmemory + " GiB";
+		int min_cpu = getMinCpu(json, demandShared, dcpu);
+		float min_memory = getMinMem(json, demandShared, dmemory);
 		for (n = 0; n < demandShared.size(); n++) {
 
 			JSONObject prod = (JSONObject) posts.get(demandShared.get(n));
@@ -305,7 +368,7 @@ public class Traitement {
 			int cpu = Integer.parseInt((String) attr.get("vcpu"));
 			String memoire = (String) attr.get("memory");
 
-			if ((cpu == dcpu) && (memoire.equals(dmemory))) {
+			if ((cpu == dcpu) && (memoire.equals(nmemory))) {
 				instances.add(demandShared.get(n));
 			}
 
@@ -316,7 +379,8 @@ public class Traitement {
 
 			instances = getInstanceMinCpu(json, demandShared, dcpu, dmemory);
 		}
-
+		System.out.println(min_cpu);
+		System.out.println(min_memory);
 		if (instances.size() == 0) {
 			// if after getting the min cpu instances.size still equal 0 than
 			// the
@@ -324,8 +388,9 @@ public class Traitement {
 			System.out.println("The product with this memory is not existed");
 
 		} else {
-			System.out.println("The instances with memory= " + dmemory
-					+ " and cpu=" + min);
+			System.out.println(instances.size());
+			System.out.println("The instances with memory= " + min_memory
+					+ " and cpu=" + min_cpu);
 			System.out
 					.println("sku\t\t\t instance \tvcpu\tlocation\tmemory\t\toperatingSystem\tlicenseModel\t\tpreInstalledSw\tprix");
 			for (n = 0; n < instances.size(); n++) {
@@ -342,13 +407,13 @@ public class Traitement {
 				String licenseModel = (String) attr.get("licenseModel");
 				String pre = (String) attr.get("preInstalledSw");
 				String sku = (String) prod.get("sku");
-				if ((location.equals("US East (Ohio)"))
-						&& (system.equals("Linux"))) {
-					System.out.println(sku + "\t" + instante + "\t" + cpu
-							+ "\t" + location + "\t" + memoire + "\t" + system
-							+ "\t" + "\t" + licenseModel + "\t" + pre + "\t"
-							+ "\t" + prix);
-				}
+
+				System.out
+						.println(sku + "\t" + instante + "\t" + cpu + "\t"
+								+ location + "\t" + memoire + "\t" + system
+								+ "\t" + "\t" + licenseModel + "\t" + pre
+								+ "\t" + "\t" + prix);
+
 			}
 		}
 
@@ -703,6 +768,7 @@ public class Traitement {
 						+ "\t" + "\t" + prix.get(o));
 
 			}
+			System.out.println(datatransfert.size());
 		}
 	}
 
@@ -846,6 +912,7 @@ public class Traitement {
 					+ "\t" + prix.get(0));
 
 		}
+		System.out.println(datatransfertinterregion.size());
 
 	}
 
@@ -884,6 +951,7 @@ public class Traitement {
 			}
 
 		}
+		System.out.println(datatransfertout.size());
 	}
 
 	/**
@@ -915,6 +983,7 @@ public class Traitement {
 			System.out.println(toLocation + "\t" + "\t" + prix.get(0));
 
 		}
+		System.out.println(datatransfertin.size());
 	}
 
 	/**
@@ -949,6 +1018,7 @@ public class Traitement {
 
 			}
 		}
+		System.out.println(datatransfertintraregion.size());
 	}
 
 	/**
@@ -1001,12 +1071,14 @@ public class Traitement {
 	 *            this is the location of the instance .
 	 * @param system
 	 *            this is the operating system of the instance .
-	 * @param locationintra
-	 *            this is the location of the inta region .
+	 * @param hour
+	 *            this is the number of hour .
+	 * @param qte
+	 *            this is the quantity of Gb.
 	 * @return Nothing
 	 */
 	public static void getPriceInstanceIntra(String instance, String location,
-			String system, String locationintra) throws FileNotFoundException,
+			String system, int hour, int qte) throws FileNotFoundException,
 			IOException, ParseException {
 
 		ArrayList<Object> datatransfertintraregion = getDataTransfertIntraRegion();
@@ -1020,13 +1092,21 @@ public class Traitement {
 					.get(datatransfertintraregion.get(i));
 			JSONObject attributes = (JSONObject) prod.get("attributes");
 			String flocation = (String) attributes.get("fromLocation");
-			if (flocation.equals(locationintra)) {
+			if (flocation.equals(location)) {
 
 				prix = getDataTransfertPrice(jsonObject,
 						datatransfertintraregion.get(i));
 				String p = (String) prix.get(0);
-				System.out.println(p + " GB/month");
-				System.out.println(price + " per hour");
+				System.out.println("the price of the data transfert: " + p
+						+ " per GB/month");
+
+				System.out.println("the price of the instance: " + price
+						+ " per hour");
+				System.out.println(Float.parseFloat(p) * qte + " $ GB/month");
+				System.out.println(price * hour + " per hour");
+				System.out.println("The final price: "
+						+ (Float.parseFloat(p) * qte + price * hour)
+						+ "$ per month");
 			}
 
 		}
@@ -1043,12 +1123,14 @@ public class Traitement {
 	 *            this is the location of the instance .
 	 * @param system
 	 *            this is the operating system of the instance .
-	 * @param tolocation
-	 *            this is the location of the in data transfer in .
+	 * @param hour
+	 *            this is the number of hour .
+	 * @param qte
+	 *            this is the quantity of Gb.
 	 * @return Nothing
 	 */
 	public static void getPriceInstanceIn(String instance, String location,
-			String system, String tolocation) throws FileNotFoundException,
+			String system, int hour, int qte) throws FileNotFoundException,
 			IOException, ParseException {
 
 		ArrayList<Object> datatransfertin = getDataTransfertIn();
@@ -1061,12 +1143,20 @@ public class Traitement {
 			JSONObject prod = (JSONObject) products.get(datatransfertin.get(i));
 			JSONObject attributes = (JSONObject) prod.get("attributes");
 			String flocation = (String) attributes.get("toLocation");
-			if (flocation.equals(tolocation)) {
+			if (flocation.equals(location)) {
 
 				prix = getDataTransfertPrice(jsonObject, datatransfertin.get(i));
 				String p = (String) prix.get(0);
-				System.out.println(p + " GB/month");
-				System.out.println(price + " per hour");
+				System.out.println("the price of the data transfert: " + p
+						+ " per GB/month");
+
+				System.out.println("the price of the instance: " + price
+						+ " per hour");
+				System.out.println(Float.parseFloat(p) * qte + " $ GB/month");
+				System.out.println(price * hour + " $ per hour");
+				System.out.println("The final price: "
+						+ (Float.parseFloat(p) * qte + price * hour)
+						+ "$ per month");
 			}
 
 		}
@@ -1083,14 +1173,16 @@ public class Traitement {
 	 *            this is the location of the instance .
 	 * @param system
 	 *            this is the operating system of the instance .
-	 * @param fromlocation
-	 *            this is the fromlocation of the inter region data transfer .
 	 * @param tolocation
 	 *            this is the tolocation of the inter region data transfer .
+	 * @param hour
+	 *            this is the number of hour .
+	 * @param qte
+	 *            this is the quantity of Gb
 	 * @return Nothing
 	 */
 	public static void getPriceInstanceInter(String instance, String location,
-			String system, String fromlocation, String tolocation)
+			String system, String tolocation, int hour, int qte)
 			throws FileNotFoundException, IOException, ParseException {
 
 		ArrayList<Object> datatransfertinterregion = getDataTransfertInterRegion();
@@ -1105,14 +1197,22 @@ public class Traitement {
 			JSONObject attributes = (JSONObject) prod.get("attributes");
 			String ffromlocation = (String) attributes.get("fromLocation");
 			String ftolocation = (String) attributes.get("toLocation");
-			if (ffromlocation.equals(fromlocation)
+			if (ffromlocation.equals(location)
 					&& (ftolocation.equals(tolocation))) {
 
 				prix = getDataTransfertPrice(jsonObject,
 						datatransfertinterregion.get(i));
 				String p = (String) prix.get(0);
-				System.out.println(p + " GB/month");
-				System.out.println(price + " per hour");
+				System.out.println("the price of the data transfert: " + p
+						+ " per GB/month");
+
+				System.out.println("the price of the instance: " + price
+						+ " per hour");
+				System.out.println(Float.parseFloat(p) * qte + " $ GB/month");
+				System.out.println(price * hour + " per hour");
+				System.out.println("The final price: "
+						+ (Float.parseFloat(p) * qte + price * hour)
+						+ "$ per month");
 			}
 
 		}
@@ -1129,26 +1229,31 @@ public class Traitement {
 	 *            this is the location of the instance .
 	 * @param system
 	 *            this is the operating system of the instance .
-	 * @param fromlocation
-	 *            this is the location of the data transfert out .
+	 * @param hour
+	 *            this is the number of hour .
+	 * @param qte
+	 *            this is the quantity of Gb
 	 * @return Nothing
 	 */
 	public static void getPriceInstanceOut(String instance, String location,
-			String system, String fromlocation) throws FileNotFoundException,
-			IOException, ParseException {
+			String system, int hour) throws FileNotFoundException, IOException,
+			ParseException {
 
 		ArrayList<Object> datatransfertout = getDataTransfertOut();
 		int i = 0;
 		Float price = getInstancePrice(instance, location, system);
+
 		JSONObject jsonObject = ReadFile();
 		JSONObject products = (JSONObject) jsonObject.get("products");
 		ArrayList<Object> prix = new ArrayList<>();
 		for (i = 0; i < datatransfertout.size(); i++) {
+
 			JSONObject prod = (JSONObject) products
 					.get(datatransfertout.get(i));
 			JSONObject attributes = (JSONObject) prod.get("attributes");
 			String ffromlocation = (String) attributes.get("fromLocation");
-			if (ffromlocation.equals(fromlocation)) {
+
+			if (ffromlocation.equals(location)) {
 
 				prix = getDataTransfertPrice(jsonObject,
 						datatransfertout.get(i));
@@ -1156,7 +1261,8 @@ public class Traitement {
 				for (i = 0; i < prix.size(); i++) {
 					System.out.println(prix.get(i));
 				}
-				System.out.println(price + " per hour");
+
+				System.out.println(price * hour + " per hour");
 			}
 
 		}
@@ -1338,6 +1444,194 @@ public class Traitement {
 	// ///////////////////////////////////////////////////////////////////////
 
 	/**
+	 * The getListReserved method is used to get a list
+	 * 
+	 * @param Nothing
+	 *            .
+	 * @return ArrayList This returns list of the skus of all products which are
+	 *         reserved.
+	 */
+	public static ArrayList<Object> getListReserved()
+			throws FileNotFoundException, IOException, ParseException {
+		ArrayList<Object> shared = getListOnDemandShared();
+		JSONObject jsonObject = ReadFile();
+		ArrayList<Object> reservedins = new ArrayList<>();
+		JSONObject terms = (JSONObject) jsonObject.get("terms");
+		JSONObject reserved = (JSONObject) terms.get("Reserved");
+
+		Set<?> s = reserved.keySet();
+		Iterator<?> i = s.iterator();
+
+		do {
+			String k = i.next().toString();
+			if (shared.contains(k))
+				reservedins.add(k);
+
+		} while (i.hasNext());
+
+		System.out.println(reservedins.size());
+		return reservedins;
+	}
+
+	/**
+	 * The getReservedPrice method is used to get the list of the price of a
+	 * reserved product
+	 * 
+	 * @param jsonObject
+	 *            this is the json file.
+	 * @param object
+	 *            this is the sku of the product that we want its prices
+	 * @return ArrayList of the price of the product
+	 */
+	public static ArrayList<Object> getReservedPrice(JSONObject jsonObject,
+			Object object) {
+
+		JSONObject posts = (JSONObject) jsonObject.get("terms");
+		JSONObject ReservedPord = (JSONObject) posts.get("Reserved");
+
+		JSONObject id = (JSONObject) ReservedPord.get(object);
+		ArrayList<Object> result = new ArrayList<>();
+		Set<?> s1 = id.keySet();
+
+		Iterator<?> i1 = s1.iterator();
+
+		do {
+			String l = i1.next().toString();
+			{
+
+				JSONObject euff = (JSONObject) id.get(l);
+				JSONObject priceDim = (JSONObject) euff.get("priceDimensions");
+
+				Set<?> s2 = priceDim.keySet();
+
+				Iterator<?> i2 = s2.iterator();
+
+				do {
+					String k = i2.next().toString();
+					{
+						JSONObject despri = (JSONObject) priceDim.get(k);
+						JSONObject priceperunit = (JSONObject) despri
+								.get("pricePerUnit");
+						String res = (String) priceperunit.get("USD");
+						result.add(res);
+
+					}
+				} while (i2.hasNext());
+
+			}
+		} while (i1.hasNext());
+
+		return result;
+	}
+
+	/**
+	 * The getReservedDescription method is used to get the description of a
+	 * reserved product
+	 * 
+	 * @param jsonObject
+	 *            this is the json file.
+	 * @param object
+	 *            this is the sku of the product that we want its description
+	 * @return ArrayList of the price of the product
+	 */
+
+	public static ArrayList<Object> getReservedDescription(
+			JSONObject jsonObject, Object object) {
+
+		JSONObject posts = (JSONObject) jsonObject.get("terms");
+		JSONObject ReservedPord = (JSONObject) posts.get("Reserved");
+
+		JSONObject id = (JSONObject) ReservedPord.get(object);
+		ArrayList<Object> result = new ArrayList<>();
+		Set<?> s1 = id.keySet();
+
+		Iterator<?> i1 = s1.iterator();
+
+		do {
+			String l = i1.next().toString();
+			{
+
+				JSONObject euff = (JSONObject) id.get(l);
+				JSONObject priceDim = (JSONObject) euff.get("priceDimensions");
+
+				Set<?> s2 = priceDim.keySet();
+
+				Iterator<?> i2 = s2.iterator();
+
+				do {
+					String k = i2.next().toString();
+					{
+						JSONObject despri = (JSONObject) priceDim.get(k);
+						String description = (String) despri.get("description");
+						result.add(description);
+
+					}
+				} while (i2.hasNext());
+
+			}
+		} while (i1.hasNext());
+
+		return result;
+	}
+
+	/**
+	 * The AfficheListReserved method is used to get the list of the reserved
+	 * products
+	 * 
+	 * @param Nothing
+	 *            .
+	 * @return Nothing.
+	 */
+	public static void AfficheListReserved() throws FileNotFoundException,
+			IOException, ParseException {
+		ArrayList<Object> ReservedProduct = getListReserved();
+		JSONObject jsonObject = ReadFile();
+		JSONObject products = (JSONObject) jsonObject.get("products");
+		int i = 0;
+		System.out.println("Reserved Instance");
+
+		System.out
+				.println("sku\t\t\tfromLocation\t\ttransfertType\t\ttoLocation\t\tdescription\t\t\t\tprix");
+		for (i = 0; i < ReservedProduct.size(); i++) {
+			ArrayList<Object> prix = getReservedPrice(jsonObject,
+					ReservedProduct.get(i));
+			ArrayList<Object> description = getReservedDescription(jsonObject,
+					ReservedProduct.get(i));
+
+			for (int o = 0; o < prix.size(); o++) {
+				JSONObject prod = (JSONObject) products.get(ReservedProduct
+						.get(i));
+				JSONObject attributes = (JSONObject) prod.get("attributes");
+				// get the instancetype
+				String instante = (String) attributes.get("instanceType");
+				// get the cpu
+				String cpu = (String) attributes.get("vcpu");
+				// get the location
+				String location = (String) attributes.get("location");
+				// get the memory
+				String memoire = (String) attributes.get("memory");
+				// get the operating system
+				String system = (String) attributes.get("operatingSystem");
+				// get the license model
+				String licenseModel = (String) attributes.get("licenseModel");
+				// get the preInstalledSw
+				String pre = (String) attributes.get("preInstalledSw");
+				// get the sku
+				String sku = (String) prod.get("sku");
+
+				String tennacy = (String) attributes.get("tenancy");
+
+				System.out.println(sku + "\t" + instante + "\t" + cpu + "\t"
+						+ location + "\t" + memoire + "\t" + system + "\t"
+						+ "\t" + licenseModel + "\t" + pre + "\t" + tennacy
+						+ "\t" + description.get(o) + "\t" + prix.get(o));
+			}
+			System.out.println(prix.size());
+		}
+	}
+
+	// ///////////////////////////////////////////
+	/**
 	 * This is the main method which makes use of the methods.
 	 * 
 	 * @param args
@@ -1353,27 +1647,42 @@ public class Traitement {
 	 * @see FileNotFoundException
 	 * @see ParseException
 	 */
+	/**
+	 * @param args
+	 * @throws FileNotFoundException
+	 * @throws IOException
+	 * @throws ParseException
+	 */
 	public static void main(String[] args) throws FileNotFoundException,
 			IOException, ParseException {
 
-		// AfficheListOnDemandShared();
-		// getInformationInstance(16, "30.5 GiB");
-		// AfficheIpAdress();
-		// AfficheDataTransfert();
-		// AfficheLoadBalance();
-		
-		// AfficheDataTransfertIntraRegion();
-		// AfficheDataTransfertIn();
-		// AfficheDataTransfertOut();
-		// AfficheDataTransfertInterRegionOut();
-	
-		// getPriceInstanceIntra("t1.micro", "US East (N. Virginia)", "Linux",
-		// "US East (N. Virginia)");
-		// getPriceInstanceInter("t1.micro", "US East (N. Virginia)", "Linux",
-		// "EU (Ireland)", "US East (N. Virginia)");
-		getPriceInstanceIn("t1.micro", "US East (N. Virginia)", "Linux",
-				"US East (N. Virginia)");
-		// getPriceInstanceOut("t1.micro", "US East (N. Virginia)", "Linux",
-		// "US East (N. Virginia)");
+		/*AfficheListOnDemandShared();
+		getInformationInstance(15, 21);
+		AfficheIpAdress();
+		AfficheDataTransfert();
+		AfficheLoadBalance();
+
+		AfficheDataTransfertIntraRegion();
+		AfficheDataTransfertIn();
+		AfficheDataTransfertOut();
+		AfficheDataTransfertInterRegionOut();
+
+		getPriceInstanceIntra("t1.micro", "US East (N. Virginia)", "Linux", 24,
+				152);
+		getPriceInstanceInter("t1.micro", "US East (N. Virginia)", "Linux",
+				"EU (Ireland)", 24, 152);
+		getPriceInstanceIn("t1.micro", "US East (N. Virginia)", "Linux", 24,
+				152);
+		getPriceInstanceOut("t1.micro", "US East (N. Virginia)", "Linux", 24);
+		getListOnDemandShared();
+
+		getListDataTransfert();
+		getDataTransfertIn();
+		getDataTransfertInterRegion();
+		getDataTransfertIntraRegion();
+		getDataTransfertOut();
+
+		AfficheListReserved();*/
+
 	}
 }
