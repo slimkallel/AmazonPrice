@@ -14,7 +14,7 @@ public class DownloadFile {
 
 	public static void getFile(URL u) throws IOException {
 		URLConnection uc = u.openConnection();
-		String FileType = uc.getContentType();
+	//	String FileType = uc.getContentType();
 		int FileLenght = uc.getContentLength();
 		if (FileLenght == -1) {
 			throw new IOException("Fichier non valide.");
