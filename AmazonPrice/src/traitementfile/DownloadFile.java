@@ -38,7 +38,7 @@ public class DownloadFile {
 		try {
 			URL racine = new URL(HOST);
 			getFile(racine);
-			System.out.println("Le File is well downloaded...");
+			System.out.println("Le File is well downloaded ...");
 		} catch (MalformedURLException e) {
 			System.err.println(HOST + " : URL non comprise.");
 		} catch (IOException e) {
